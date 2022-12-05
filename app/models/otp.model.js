@@ -15,6 +15,9 @@ module.exports = (sequelize, Sequelize) => {
     is_process: {
       type: Sequelize.STRING,
     },
+    is_active: {
+      type: Sequelize.STRING,
+    },
   });
   return Otp;
 }
