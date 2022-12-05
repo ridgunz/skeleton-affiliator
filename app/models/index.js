@@ -21,4 +21,5 @@ db.sequelize = sequelize;
 // define semua models yang ada pada aplikasi
 db.books = require('./book.model')(sequelize, Sequelize);
 db.otps = require('./otp.model')(sequelize, Sequelize);
+db.customers = require('./customers.model')(sequelize, Sequelize);
 module.exports = db;

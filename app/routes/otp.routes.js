@@ -4,5 +4,6 @@ const router = require('express').Router();
 router.get('/generate', otpController.generate);
 router.post('/cek-phone', otpController.cekPhone);
 router.post('/create-otp', otpController.createOtp);
+router.post('/delete-otp', otpController.deleteOtp);
 
 module.exports = router;
