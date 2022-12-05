@@ -5,6 +5,7 @@ const date = () => new Date().getFullYear() + '-' + ("0" + (new Date().getMonth(
 const { Op, literal, fn } = require('sequelize');
 const axiosMaster = require('axios');
 const time = () => (Date.now() / 1000).toFixed()
+const bcrypt = require('bcrypt');
 
 const axios = axiosMaster.create({
   //verify: false,
@@ -26,29 +27,19 @@ const generate = async () => {
   return otp;
 };
 
-const cekPhone = async (phone) => {
-
+const cekPhone = async (phone, email) => {
+  //Cek apakah akun sudah terdaftar 
   const cek_phones = await Customers.findOne({
     where: {
-      phone: phone
+      [Op.or]:
+        [
+          { email: email },
+          { phone: phone }
+        ]
     }
   });
 
-  if (!cek_phones) {
-    return {
-      code: 200,
-      success: true,
-      data: null,
-      message: "Phone available to register",
-    }
-  } else {
-    return {
-      code: 400,
-      success: false,
-      data: null,
-      message: "Phone already registered",
-    }
-  }
+  return cek_phones;
 };
 
 const sendWhatsapp = async (phone, message) => {
@@ -70,7 +61,6 @@ const createOtp = async (req, res) => {
   const { phone } = req.body;
   let validity = 300;
 
-  cek_phone = await cekPhone(phone);
   generate_otp = await generate();
   delete_phone = await deleteOtp(phone);
 
@@ -122,58 +112,47 @@ const createOtp = async (req, res) => {
     });
   }
 
-  if (cek_phone.code == 200) {
+  const message = `JUARA - Kode verifikasi OTP anda adalah ${generate_otp} Jangan informasikan kode ini ke orang lain.`;
 
-    const message = `JUARA - Kode verifikasi OTP anda adalah ${generate_otp} Jangan informasikan kode ini ke orang lain.`;
+  const checkSendOtp = await sendWhatsapp(phone, message)
 
-    const checkSendOtp = await sendWhatsapp(phone, message)
+  if (!checkSendOtp) {
+    return res.status(400).json({
+      code: 400,
+      success: false,
+      data: null,
+      message: "OTP failed to send",
+    });
+  }
 
-    if (!checkSendOtp) {
-      return res.status(400).json({
-        code: 400,
-        success: false,
-        data: null,
-        message: "OTP failed to send",
-      });
-    }
+  await Otp.create({
+    phone: phone,
+    otp: generate_otp,
+    date: date(),
+    time: Math.round(Date.now() / 1000) + validity,
+    is_process: 1,
+    is_active: 1
+  }).catch(error => {
+    return res.status(400).json({
+      code: 400,
+      success: false,
+      message: error.message
+    });
+  });
 
-    await Otp.create({
+  return res.status(200).json({
+    code: 200,
+    success: true,
+    data: {
       phone: phone,
       otp: generate_otp,
       date: date(),
       time: Math.round(Date.now() / 1000) + validity,
       is_process: 1,
       is_active: 1
-    }).catch(error => {
-      return res.status(400).json({
-        code: 400,
-        success: false,
-        message: error.message
-      });
-    });
-
-    return res.status(200).json({
-      code: 200,
-      success: true,
-      data: {
-        phone: phone,
-        otp: generate_otp,
-        date: date(),
-        time: Math.round(Date.now() / 1000) + validity,
-        is_process: 1,
-        is_active: 1
-      },
-      message: "OTP successfully create"
-    });
-
-  } else if (cek_phone.code == 400) {
-    return res.status(400).json({
-      code: 400,
-      success: false,
-      data: null,
-      message: "Phone already registered",
-    });
-  }
+    },
+    message: "OTP successfully create"
+  });
 
 };
 
@@ -245,7 +224,8 @@ const cekOtp = async (req, res) => {
     return res.status(200).json({
       code: 200,
       success: true,
-      message: "OTP successfulyy match"
+      data: phone,
+      message: "OTP successfully match"
     });
   } else {
     return res.status(400).json({
@@ -255,7 +235,99 @@ const cekOtp = async (req, res) => {
     });
   }
 
+};
+
+const newAccount = async (req, res) => {
+  const { name, phone, email } = req.body;
+
+  //Cek apakah user pernah daftar sebelumnya
+  //Jika belum create user terlebih dahulu
+  //Jika sudah pernah daftar tidak perlu create ulang
+  cek_phone = await cekPhone(phone, email);
+
+  if (!cek_phone) {
+    await Customers.create({
+      name: name,
+      phone: phone,
+      email: email,
+      register_via: "AFF",
+      member_type: 5,
+      status: 0,
+      phone_status: 1,
+      is_gepd: 0
+
+    }).catch(error => {
+      return res.status(400).json({
+        code: 400,
+        success: false,
+        message: error.message
+      });
+    });
+
+    return res.status(200).json({
+      code: 200,
+      success: true,
+      data: null,
+      message: "Account successfully register",
+    });
+
+  } else {
+    return res.status(200).json({
+      code: 200,
+      success: true,
+      data: cek_phone,
+      message: "Account already registered",
+    });
+  }
+
+};
+
+async function checkPassword(password, repassword) {
+
+  const match = password == repassword;
+  return match;
 }
 
-module.exports = { generate, cekPhone, createOtp, deleteOtp, cekOtp }
+const createPassword = async (req, res) => {
+  //phone diambil pada saat cek otp
+  const { password, repassword, phone } = req.body;
+
+  const saltRounds = 10;
+  const salt = bcrypt.genSaltSync(saltRounds);
+  const hashPassword = bcrypt.hashSync(password, salt);
+
+  cek_pw = await checkPassword(password, repassword);
+
+  if (cek_pw) {
+
+    await Customers.update({ password: hashPassword }, {
+      where:
+      {
+        phone: phone
+      }
+    }).catch(error => {
+      return res.status(400).json({
+        code: 400,
+        success: false,
+        message: error.message
+      });
+    });
+
+    return res.status(200).json({
+      code: 200,
+      success: true,
+      data: hashPassword,
+      message: "Password successfully create",
+    });
+  } else {
+    return res.status(400).json({
+      code: 400,
+      success: false,
+      message: "Password and repassword not match",
+    });
+  }
+
+};
+
+module.exports = { generate, cekPhone, createOtp, deleteOtp, cekOtp, newAccount, createPassword }
 
