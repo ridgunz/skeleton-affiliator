@@ -272,9 +272,9 @@ const newAccount = async (req, res) => {
     });
 
   } else {
-    return res.status(200).json({
-      code: 200,
-      success: true,
+    return res.status(400).json({
+      code: 400,
+      success: false,
       data: cek_phone,
       message: "Account already registered",
     });
