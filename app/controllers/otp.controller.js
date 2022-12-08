@@ -57,7 +57,7 @@ const sendWhatsapp = async (phone, message) => {
   return await res.status
 };
 
-const createOtp = async (req, res) => {
+const resendOtp = async (req, res) => {
   const { phone } = req.body;
   let validity = 300;
 
@@ -112,7 +112,7 @@ const createOtp = async (req, res) => {
     });
   }
 
-  const message = `JUARA - Kode verifikasi OTP anda adalah ${generate_otp} Jangan informasikan kode ini ke orang lain.`;
+  const message = `IMPIAN - Kode verifikasi OTP anda adalah ${generate_otp} Jangan informasikan kode ini ke orang lain.`;
 
   const checkSendOtp = await sendWhatsapp(phone, message)
 
@@ -264,6 +264,8 @@ const newAccount = async (req, res) => {
       });
     });
 
+    await createOtp(phone);
+
     return res.status(200).json({
       code: 200,
       success: true,
@@ -329,5 +331,104 @@ const createPassword = async (req, res) => {
 
 };
 
-module.exports = { generate, cekPhone, createOtp, deleteOtp, cekOtp, newAccount, createPassword }
+
+const createOtp = async (phone) => {
+  let validity = 300;
+
+  generate_otp = await generate();
+  delete_phone = await deleteOtp(phone);
+
+  count = await Otp.count({
+    where: {
+      phone: phone,
+      date: new Date(date()),
+    }
+  });
+
+  const cek = await Otp.findOne({
+    where:
+    {
+      [Op.and]:
+        [
+          { phone: phone }
+        ]
+    },
+    order:
+      [
+        ['id', 'DESC']
+      ]
+  }).catch(error => {
+    return {
+      code: 400,
+      success: false,
+      message: error.message
+    };
+  });
+
+  if (count) {
+    if (Number(cek.time) > Number(time())) {
+      return {
+        code: 400,
+        success: false,
+        data: null,
+        message: "OTP already sent, cek on your whatsapp or wait until the time runs out ",
+      };
+    }
+  }
+
+
+  if (count >= 5) {
+    return {
+      code: 400,
+      success: false,
+      data: null,
+      message: "OTP can't be more than 5 perday",
+    };
+  }
+
+  const message = `IMPIAN - Kode verifikasi OTP anda adalah ${generate_otp} Jangan informasikan kode ini ke orang lain.`;
+
+  const checkSendOtp = await sendWhatsapp(phone, message)
+
+  if (!checkSendOtp) {
+    return {
+      code: 400,
+      success: false,
+      data: null,
+      message: "OTP failed to send",
+    };
+  }
+
+  await Otp.create({
+    phone: phone,
+    otp: generate_otp,
+    date: date(),
+    time: Math.round(Date.now() / 1000) + validity,
+    is_process: 1,
+    is_active: 1
+  }).catch(error => {
+    return {
+      code: 400,
+      success: false,
+      message: error.message
+    };
+  });
+
+  return {
+    code: 200,
+    success: true,
+    data: {
+      phone: phone,
+      otp: generate_otp,
+      date: date(),
+      time: Math.round(Date.now() / 1000) + validity,
+      is_process: 1,
+      is_active: 1
+    },
+    message: "OTP successfully create"
+  };
+
+};
+
+module.exports = { generate, cekPhone, createOtp, deleteOtp, cekOtp, newAccount, createPassword, resendOtp }
 

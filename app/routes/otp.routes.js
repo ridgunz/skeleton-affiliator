@@ -5,6 +5,7 @@ router.post('/create-otp', otpController.createOtp);
 router.post('/cek-otp', otpController.cekOtp);
 router.post('/create-account', otpController.newAccount);
 router.post('/create-password', otpController.createPassword);
+router.post('/resend-otp', otpController.resendOtp);
 
 
 module.exports = router;
