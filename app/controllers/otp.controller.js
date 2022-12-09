@@ -237,6 +237,32 @@ const cekOtp = async (req, res) => {
 
 };
 
+const generateCode = async () => {
+  const cek = await Customers.findOne({
+    where:
+    {
+      code:
+      {
+        [Op.like]: 'AF%'
+      }
+    },
+    order:
+      [
+        ['code', 'DESC']
+      ]
+  });
+
+  let calculate = 1;
+  let code = cek.code;
+  alpha = code.substring(0, 2)
+  codex = code.substring(2, 7);
+  calculate += parseInt(codex);
+  new_code = calculate.toString().padStart(5, "0");
+  reverb = alpha + new_code;
+
+  return reverb;
+};
+
 const newAccount = async (req, res) => {
   const { name, phone, email } = req.body;
 
@@ -244,9 +270,11 @@ const newAccount = async (req, res) => {
   //Jika belum create user terlebih dahulu
   //Jika sudah pernah daftar tidak perlu create ulang
   cek_phone = await cekPhone(phone, email);
+  codex = await generateCode();
 
   if (!cek_phone) {
     await Customers.create({
+      code: codex,
       name: name,
       phone: phone,
       email: email,
@@ -430,5 +458,5 @@ const createOtp = async (phone) => {
 
 };
 
-module.exports = { generate, cekPhone, createOtp, deleteOtp, cekOtp, newAccount, createPassword, resendOtp }
+module.exports = { generate, cekPhone, createOtp, deleteOtp, cekOtp, newAccount, createPassword, resendOtp, generateCode }
 

@@ -1,5 +1,8 @@
 module.exports = (sequelize, Sequelize) => {
   const Customers = sequelize.define('customers', {
+    code: {
+      type: Sequelize.STRING,
+    },
     phone: {
       type: Sequelize.STRING,
     },
